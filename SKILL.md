@@ -55,6 +55,11 @@ non-obvious fact as worth saving the moment you learn it.
    Read the summaries; pull full content only for hits that matter
    (`get <id>`, or add `--content` to the search).
 
+   Mid-task too: before answering any question about prior decisions, findings,
+   environment quirks, or established practices — even small ones like "do our
+   tarballs need license files?" — search zvmem first. One cheap lookup beats
+   re-deriving from disk; verify hits against current file state as needed.
+
 2. **Save as you learn — immediately, not batched "for later".** The moment you
    discover something non-obvious (a decision and *why*, a gotcha, an environment
    quirk, a workaround), write it down right away:

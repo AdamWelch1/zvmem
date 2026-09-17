@@ -284,11 +284,12 @@ export default function (pi: ExtensionAPI) {
     description:
       "Persistent project memory store — memories survive context compaction and across sessions. " +
       "Actions: init (create the .zvmem store), add, search (hybrid/dense/sparse/fts; optional rerank/filter), " +
-      "get, update, delete, list, stats. Search it before deep-diving into code/docs for information that may already be known; " +
+      "get, update, delete, list, stats. Search it FIRST for any question about this project's prior decisions, findings, " +
+      "environment quirks, or established practices — even small ones — before exploring code/docs on disk; " +
       "recall relevant knowledge before starting work; save non-obvious facts as you learn them.",
     promptSnippet: "Persistent project memory: recall/save/update/delete memories that survive compaction and sessions",
     promptGuidelines: [
-      "Search zvmem before deep-diving into code/docs for information that may already be known (prior decisions, environment quirks, how things work in this project); if you find it in code/docs instead and it's worth remembering, save it as a memory.",
+      "Search zvmem FIRST for any question about this project's prior decisions, findings, environment quirks, or established practices (build/packaging steps, how things work here) — including small questions like 'do our tarballs need license files?'. One cheap lookup beats re-deriving from disk; after a hit, verify against current file state only if the answer depends on it. If you find in code/docs something worth remembering instead, save it as a memory.",
       "Store knowledge as discrete memories — one focused memory per fact, decision, or event (separate small notes beat one big catch-all). Use stable descriptive ids and short tags.",
       "Keep the 'session-state' memory concise: current status, open questions, next steps, and pointers to other memories by id. Details live in their own memories — update it after every meaningful step.",
       "Track information in zvmem unless the user explicitly asks for a file (e.g. a roadmap or plan document) — then create the file instead of a memory.",
