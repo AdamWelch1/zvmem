@@ -1,0 +1,10 @@
+# zvmem (C++) build output, local memory collections,
+# and the vendored zvec source checkout (cloned separately — see README)
+build/
+.zvmem/
+zvec-src/
+
+# zvmemd (Python)
+zvmemd/.venv/
+__pycache__/
+*.pyc

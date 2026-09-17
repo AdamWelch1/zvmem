@@ -1,0 +1,11 @@
+# zvmemd dependencies (Python 3.10+).
+# On a Linux GPU server, pip installs the CUDA-enabled torch build by default.
+# Pin a specific CUDA variant if needed:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+torch>=2.4
+transformers>=4.46
+# Verified against FlagEmbedding 1.4.2 (BGEM3FlagModel API).
+FlagEmbedding>=1.4.2
+fastapi>=0.111
+uvicorn[standard]>=0.30
+numpy<2
