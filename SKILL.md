@@ -87,9 +87,10 @@ non-obvious fact as worth saving the moment you learn it.
    After compaction — or at the start of any new session — re-read it to resume:
    `zvmem --path .zvmem get session-state`.
 
-4. **When information changes, `update` — don't add near-duplicates.** Stale
-   memories poison search results. If a memory is wrong or obsolete, `update` it
-   (re-embeds automatically) or `delete` it.
+4. **Keep ALL memories current as work progresses — `update`, don't add near-duplicates.**
+   Stale memories poison search results. The moment you complete a task, make a decision,
+   or learn something that supersedes an existing memory, `update` it (re-embeds
+   automatically) or `delete` it in the same turn — don't wait until you next search for it.
 
 If your agent supports lifecycle hooks, wire them to this workflow: run step 1 at
 session start and re-read `session-state` after compaction. Hooks reduce the risk

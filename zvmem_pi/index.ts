@@ -294,7 +294,7 @@ export default function (pi: ExtensionAPI) {
       "Keep the 'session-state' memory concise: current status, open questions, next steps, and pointers to other memories by id. Details live in their own memories — update it after every meaningful step.",
       "Track information in zvmem unless the user explicitly asks for a file (e.g. a roadmap or plan document) — then create the file instead of a memory.",
       "Save immediately when you learn something non-obvious (a decision and why, a gotcha, an environment quirk) — never batch saves 'for later'.",
-      "When information changes, use zvmem update (or delete) on the existing id instead of adding near-duplicates — stale memories poison search results.",
+      "Actively keep ALL memories current as work progresses — not just session-state: the moment you complete a task, make a decision, or learn something that supersedes what an existing memory says, update (or delete) that memory in the same turn; don't wait until you next search for it. Use zvmem update on the existing id instead of adding near-duplicates — stale memories poison search results (update re-embeds automatically).",
       "Prefer the zvmem tool over raw bash calls to the zvmem CLI.",
     ],
     parameters: zvmemSchema,
