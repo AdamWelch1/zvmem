@@ -28,7 +28,7 @@ curl http://<gpu-host>:8080/health   # → {"status":"ok", ...}
 ### 2. Build `zvmem` (on the machine where your agent runs)
 
 ```bash
-git clone <this-repo> && cd <repo>
+git clone https://github.com/AdamWelch1/zvmem && cd <repo>
 
 # zvec source, pinned v0.7.0 with submodules:
 git clone https://github.com/alibaba/zvec.git zvec-src
