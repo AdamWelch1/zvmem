@@ -1,8 +1,11 @@
 # zvmem_pi — pi extension for the zvmem skill
 
-Runs the `zvmem` skill automatically at three lifecycle points, exactly as if you
-had typed `/skill:zvmem <scenario>` yourself (the skill content is expanded into
-a user message and triggers an agent turn):
+Runs the `zvmem` skill automatically at three lifecycle points. The skill content
+is injected as a **custom message** with `triggerTurn: true` — the LLM receives
+exactly what `/skill:zvmem <scenario>` would expand to and acts on it, but the
+entry is not a user message, so it never shows up as the session title in
+`/resume` (your real first prompt does) and `display: false` keeps the chat
+transcript clean (a footer notify confirms each run):
 
 | Scenario | pi event | What it tells the skill to do |
 |---|---|---|
