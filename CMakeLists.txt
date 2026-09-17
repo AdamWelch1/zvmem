@@ -101,6 +101,10 @@ target_include_directories(json_iface INTERFACE "${nlohmann_json_SOURCE_DIR}/inc
 
 find_package(CURL REQUIRED)
 
+# Ship without any baked-in RPATH/RUNPATH: in shared mode users install
+# libzvec.so on their system where the dynamic linker finds it normally.
+set(CMAKE_SKIP_RPATH ON)
+
 # ---------------------------------------------------------------------------
 # zvmem executable
 # ---------------------------------------------------------------------------
@@ -126,9 +130,8 @@ if(ZVMEM_ZVEC_MODE STREQUAL "static")
 else()
   target_link_libraries(zvmem PRIVATE zvec_sdk)
 
-  set_target_properties(zvmem PROPERTIES
-      BUILD_RPATH "$ORIGIN;$ORIGIN/../third_party/zvec-sdk/lib"
-      INSTALL_RPATH "$ORIGIN")
+  # No RPATH (CMAKE_SKIP_RPATH above): libzvec.so must be installed on the
+  # user's system, where the dynamic linker finds it.
 
   # Ship the SDK library next to the binary so the tool is self-contained.
   add_custom_command(TARGET zvmem POST_BUILD
