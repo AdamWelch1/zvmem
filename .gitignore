@@ -8,3 +8,4 @@ zvec-src/
 zvmemd/.venv/
 __pycache__/
 *.pyc
+build-dyn/
