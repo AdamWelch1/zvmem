@@ -13,7 +13,7 @@
 | `zvmem` (C++ CLI) | The memory interface: `init`, `add`, `search`, `get`, `update`, `delete`, `list`, `stats`. Talks to a local zvec collection and the remote embedding service. JSON on stdout, terse errors on stderr, stable exit codes. |
 | [`zvmemd/`](zvmemd/) (Python daemon) | Self-contained GPU service serving `/v1/embeddings` (bge-m3 dense + sparse) and `/v1/rerank` (cross-encoder). Copy the folder to any NVIDIA-GPU machine, run `./run.sh`, done. |
 | [`SKILL.md`](SKILL.md) | The agent-facing skill: when to save/recall, how to write good memories, full command reference, exit-code handling. Install it wherever your coding agent discovers skills. |
-| [`zvmem_pi/`](zvmem_pi/) (pi extension) | A pi coding-agent extension that runs the zvmem skill automatically at session start, on resume, and after compaction — so agents recall state without being prompted. |
+| [`zvmem_pi/`](zvmem_pi/) (pi extension) | **Preferred for pi users** over `SKILL.md`: bakes the whole skill into a first-class `zvmem` tool and automates it — opt-in recall on new/resume sessions, automatic post-compaction recall, invisible save reminders. No SKILL.md install needed. |
 
 ## Quick start
 
@@ -53,8 +53,8 @@ zvmem --path .zvmem search --query "why did our threads hang"
 
 ### 4. Wire it into your agent
 
-- **Any agent:** copy `SKILL.md` to where the agent discovers skills (e.g. `~/.pi/agent/skills/zvmem/SKILL.md`). The skill teaches the workflow: recall at session start, save as you learn, keep a stable `session-state` memory fresh.
-- **pi users:** additionally enable [`zvmem_pi/index.ts`](zvmem_pi/) so the skill runs automatically on new sessions, resumes, and after compaction (see its README).
+- **pi users — preferred:** install the [`zvmem_pi/`](zvmem_pi/) extension instead of `SKILL.md`. It bakes the entire skill into a first-class `zvmem` tool and automates zvmem within pi: recall on new/resume sessions (asked via confirm dialog), automatic post-compaction recall, and invisible nudges that keep the model saving without being prompted — functionality the plain skill does not provide. See its README for install steps.
+- **Other agents:** copy `SKILL.md` to where your agent discovers skills. The skill teaches the workflow: recall at session start, save as you learn, keep a stable `session-state` memory fresh.
 
 ## Using zvmem
 
