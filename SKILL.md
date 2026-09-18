@@ -66,6 +66,10 @@ non-obvious fact as worth saving the moment you learn it.
    decisions, and quirks are usually already stored. Use your own expertise for
    genuinely general questions.
 
+   Close the loop: if you derive the answer yourself (from code, docs, or running
+   something) and it wasn't in memory, save it right away — noting whether it's
+   verified or just inferred — so future sessions find it instead of re-deriving.
+
 2. **Save as you learn — immediately, not batched "for later".** The moment you
    discover something non-obvious (a decision and *why*, a gotcha, an environment
    quirk, a workaround), write it down right away:
