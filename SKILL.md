@@ -60,6 +60,12 @@ non-obvious fact as worth saving the moment you learn it.
    tarballs need license files?" — search zvmem first. One cheap lookup beats
    re-deriving from disk; verify hits against current file state as needed.
 
+   Mid-reasoning too: when you generate open questions while thinking through a
+   problem ("why does X fail here?", "what did we decide about Y?"), search zvmem
+   before answering them from general knowledge — project-specific findings,
+   decisions, and quirks are usually already stored. Use your own expertise for
+   genuinely general questions.
+
 2. **Save as you learn — immediately, not batched "for later".** The moment you
    discover something non-obvious (a decision and *why*, a gotcha, an environment
    quirk, a workaround), write it down right away:
