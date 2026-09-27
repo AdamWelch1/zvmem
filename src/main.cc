@@ -3,6 +3,7 @@
 
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -243,6 +244,101 @@ njson doc_to_json(const MemoryDoc& m, bool include_content, bool with_scores) {
   return j;
 }
 
+// ---------------------------------------------------------------------------
+// File descriptor headroom.
+//
+// zvec opens every persisted segment eagerly at collection open and keeps
+// each one's files open for the whole process: 1 fd per dense/sparse proxima
+// index file, 1 fd per scalar .ipc forward store (Arrow holds its fd for the
+// mapping's lifetime), plus RocksDB SSTs (max_open_files defaults to -1 =
+// keep them all open). Measured on a ~182-segment collection: peak ≈ 975 fds.
+// The count grows linearly with the number of segments, so sessions with a
+// low RLIMIT_NOFILE (Debian's PAM default is 1024) hit EMFILE mid-open:
+//   "Failed to open file .../sparse.index.N.proxima, Too many open files"
+//
+// We cannot cap zvec's fd usage from here, so we make the best of it:
+// raise our soft limit up to the hard limit (allowed without root), estimate
+// what this collection will need by counting its index/store/SST files on
+// disk, and warn with an actionable suggestion when headroom is short.
+
+long current_soft_fd_limit() {
+  struct rlimit rl{};
+  if (::getrlimit(RLIMIT_NOFILE, &rl) != 0) return -1;
+  return static_cast<long>(rl.rlim_cur);
+}
+
+void raise_fd_limit_to_hard() {
+  struct rlimit rl{};
+  if (::getrlimit(RLIMIT_NOFILE, &rl) != 0) return;
+  if (rl.rlim_cur >= rl.rlim_max) return;  // nothing to gain
+  // A non-root process may raise its soft limit up to the hard one. If the
+  // hard limit is unlimited, pick a generous finite value.
+  const rlim_t want =
+      rl.rlim_max == RLIM_INFINITY ? static_cast<rlim_t>(65536) : rl.rlim_max;
+  struct rlimit up = {want, rl.rlim_max};
+  ::setrlimit(RLIMIT_NOFILE, &up);  // best effort; soft may still end below want
+}
+
+// Rough upper bound on the fds zvec will hold while this collection is open:
+// one per *.proxima index file and *.ipc forward store (always held), one per
+// *.sst RocksDB table file (opened lazily, never evicted without a cap), plus
+// fixed overhead (per-RocksDB-instance WAL/LOG/MANIFEST/CURRENT files, the
+// collection LOCK/manifest, process + library fds).
+long estimate_collection_open_files(const std::string& path) {
+  long proxima = 0, ipc = 0, sst = 0, rocksdb_dirs = 0;
+  std::error_code ec;
+  for (auto it = std::filesystem::recursive_directory_iterator(path, ec);
+       !ec && it != std::filesystem::recursive_directory_iterator();
+       it.increment(ec)) {
+    if (it->is_directory(ec)) {
+      const std::string name = it->path().filename().string();
+      if (name.size() > 8 && name.compare(name.size() - 8, 8, ".rocksdb") == 0) ++rocksdb_dirs;
+    } else if (it->is_regular_file(ec)) {
+      const std::string ext = it->path().extension().string();
+      if (ext == ".proxima") ++proxima;
+      else if (ext == ".ipc") ++ipc;
+      else if (ext == ".sst") ++sst;
+    }
+  }
+  return proxima + ipc + sst + rocksdb_dirs * 8 + 50;
+}
+
+long suggest_fd_limit(long need) {
+  const long rounded = ((need + 768) / 1024) * 1024;  // +75% headroom, round up
+  return std::max(8192L, rounded);
+}
+
+void ensure_fd_headroom(const std::string& path) {
+  raise_fd_limit_to_hard();
+  if (!std::filesystem::is_directory(path)) return;  // e.g. 'init' target
+  const long need = estimate_collection_open_files(path);
+  const long have = current_soft_fd_limit();
+  if (have < 0 || have >= need) return;
+  std::fprintf(
+      stderr,
+      "warning: file descriptor limit is %ld but this collection needs ~%ld open "
+      "files; searches may fail with 'Too many open files'. Raise the limit, e.g. "
+      "'ulimit -n %ld' (or LimitNOFILE in systemd / limits.conf).\n",
+      have, need, suggest_fd_limit(need));
+}
+
+std::unique_ptr<Store> open_store_or_die(const std::string& path, bool read_only) {
+  std::string err;
+  auto store = Store::open(path, read_only, err);
+  if (!store) {
+    std::string msg = "failed to open collection: " + err;
+    const long have = current_soft_fd_limit();
+    const long need = estimate_collection_open_files(path);
+    if (have > 0 && have < need) {
+      msg += " — note: this collection needs ~" + std::to_string(need) +
+             " open files but your limit is " + std::to_string(have) +
+             "; try 'ulimit -n " + std::to_string(suggest_fd_limit(need)) + "'";
+    }
+    die(ExitCode::Internal, msg);
+  }
+  return store;
+}
+
 // Advisory exclusive lock for write commands: flock on <path>/.zvmem.lock with a
 // non-blocking retry loop. Holding it before opening zvec in read-write mode
 // guarantees zvec's internal write lock cannot block us (PLAN.md §9).
@@ -359,11 +455,10 @@ int cmd_add(const Args& a, Config& cfg) {
 
   const std::string path = require_collection(cfg);
   WriteLock lock(path, cfg.lock_timeout_ms);
-  std::string err;
-  auto store = Store::open(path, false /*read-write*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
+  auto store = open_store_or_die(path, false /*read-write*/);
 
   EmbedClient client(cfg);
+  std::string err;
   EmbedResponse emb;
   if (!client.embed({truncate(summary_raw, kMaxEmbedInputChars)}, emb, err)) {
     die(ExitCode::EmbedError, err);
@@ -414,9 +509,8 @@ int cmd_search(const Args& a, Config& cfg) {
   const int candidates = int_flag(a, "candidates", std::max(3 * k, 50));
 
   const std::string path = require_collection(cfg);
+  auto store = open_store_or_die(path, true /*read-only*/);
   std::string err;
-  auto store = Store::open(path, true /*read-only*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   const std::string query = truncate(query_raw, kMaxEmbedInputChars);
   EmbedClient client(cfg);
@@ -481,9 +575,8 @@ int cmd_search(const Args& a, Config& cfg) {
 int cmd_get(const Args& a, Config& cfg) {
   if (a.positional.empty()) die(ExitCode::Usage, "usage: zvmem get ID [ID...]");
   const std::string path = require_collection(cfg);
+  auto store = open_store_or_die(path, true /*read-only*/);
   std::string err;
-  auto store = Store::open(path, true /*read-only*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   std::vector<MemoryDoc> found;
   std::vector<std::string> not_found;
@@ -510,9 +603,8 @@ int cmd_update(const Args& a, Config& cfg) {
 
   const std::string path = require_collection(cfg);
   WriteLock lock(path, cfg.lock_timeout_ms);
+  auto store = open_store_or_die(path, false /*read-write*/);
   std::string err;
-  auto store = Store::open(path, false /*read-write*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   std::vector<MemoryDoc> found;
   std::vector<std::string> not_found;
@@ -550,9 +642,8 @@ int cmd_delete(const Args& a, Config& cfg) {
   if (a.positional.empty()) die(ExitCode::Usage, "usage: zvmem delete ID [ID...]");
   const std::string path = require_collection(cfg);
   WriteLock lock(path, cfg.lock_timeout_ms);
+  auto store = open_store_or_die(path, false /*read-write*/);
   std::string err;
-  auto store = Store::open(path, false /*read-write*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   std::vector<std::string> deleted;
   std::vector<std::string> not_found;
@@ -574,9 +665,8 @@ int cmd_list(const Args& a, Config& cfg) {
   const bool include_content = has_switch(a, "content");
 
   const std::string path = require_collection(cfg);
+  auto store = open_store_or_die(path, true /*read-only*/);
   std::string err;
-  auto store = Store::open(path, true /*read-only*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   std::vector<MemoryDoc> docs;
   if (!store->list(limit, docs, err)) die(ExitCode::Internal, "list failed: " + err);
@@ -592,9 +682,8 @@ int cmd_list(const Args& a, Config& cfg) {
 
 int cmd_stats(const Args& a, Config& cfg) {
   const std::string path = require_collection(cfg);
+  auto store = open_store_or_die(path, true /*read-only*/);
   std::string err;
-  auto store = Store::open(path, true /*read-only*/, err);
-  if (!store) die(ExitCode::Internal, "failed to open collection: " + err);
 
   std::string json;
   if (!store->stats_json(json, err)) die(ExitCode::Internal, "stats failed: " + err);
@@ -618,6 +707,8 @@ int main(int argc, char** argv) {
   }
   if (has_switch(a, "pretty")) cfg.pretty = true;
   if (cfg.path.empty()) cfg.path = "~/.zvmem/default";
+
+  ensure_fd_headroom(cfg.resolved_path());
 
   const std::string& cmd = a.command;
   if (cmd == "init") return cmd_init(a, cfg);
