@@ -392,8 +392,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("context", async (event, ctx) => {
     if (ctx.mode !== "tui") return; // leave scripted runs alone
     const now = Date.now();
-    // Global floor: rapid successive tool calls must never produce back-to-back nudges.
+    // Global floor: rapid successive tool calls must never produce back-to-back
+    // nudges. Claim the slot AT gate-pass time, before any trigger check: pi can
+    // invoke transformContext concurrently for one request (unawaited), and both
+    // invocations read lastNudgeAt before either writes — without this claim, a
+    // race lets two reminders fire back-to-back.
     if (now - lastNudgeAt < MIN_NUDGE_GAP_MS) return;
+    lastNudgeAt = now;
     const staleSinceWrite = now - lastWriteAt >= TEN_MINUTES_MS;
     const staleCooldownOk = now - lastStaleNudgeAt >= STALE_REMINDER_COOLDOWN_MS;
     // Trigger A: previous turn did work without saving. Trigger B: long stretch
